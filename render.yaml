@@ -1,0 +1,29 @@
+# Blueprint for the keeper when it is deployed from its public mirror (yong9292/aureum-keeper), which Render can
+# read without the GitHub app. The private monorepo's root render.yaml is the same job with rootDir keeper.
+services:
+  - type: cron
+    name: aureum-keeper
+    runtime: node
+    region: oregon
+    plan: starter
+    repo: https://github.com/yong9292/aureum-keeper
+    branch: main
+    schedule: "*/10 * * * *"
+    buildCommand: npm install --omit=dev
+    startCommand: npm run tick
+    autoDeployTrigger: off
+    envVars:
+      - key: NODE_VERSION
+        value: 22.14.0
+      - key: RH_RPC_URL
+        value: https://rpc.mainnet.chain.robinhood.com
+      - key: COLLECTOR
+        value: ""
+      - key: RESERVE
+        value: ""
+      - key: MIN_CLAIM_WEI
+        value: "20000000000000000"
+      - key: SLIPPAGE_BPS
+        value: "100"
+      - key: KEEPER_KEY
+        sync: false
