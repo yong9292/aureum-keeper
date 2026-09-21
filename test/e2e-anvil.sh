@@ -31,7 +31,12 @@ cd ../keeper
 NVDA=0xd0601CE157Db5bdC3162BbaC2a2C8aF5320D9EEC
 BEFORE=$(cast call $NVDA "balanceOf(address)(uint256)" "$RESERVE" --rpc-url "$LOCAL")
 RH_RPC_URL="$LOCAL" CHAIN_ID=4663 COLLECTOR="$COLLECTOR" RESERVE="$RESERVE" KEEPER_KEY="$KEEPER_KEY" MIN_CLAIM_WEI=1000000000000000 node src/tick.mjs
+echo "second tick, no new fees: it keeps laying the pay token along the lines"
+RH_RPC_URL="$LOCAL" CHAIN_ID=4663 COLLECTOR="$COLLECTOR" RESERVE="$RESERVE" KEEPER_KEY="$KEEPER_KEY" MIN_CLAIM_WEI=1000000000000000 node src/tick.mjs
 AFTER=$(cast call $NVDA "balanceOf(address)(uint256)" "$RESERVE" --rpc-url "$LOCAL")
+echo "reserve ledger (sweeps, paid, last):   $(cast call "$RESERVE" "ledger()(uint256,uint256,uint256)" --rpc-url "$LOCAL" | tr '\n' ' ')"
+echo "collector ledger (count, eth, usdg, last): $(cast call "$COLLECTOR" "ledger()(uint256,uint256,uint256,uint256)" --rpc-url "$LOCAL" | tr '\n' ' ')"
+for T in 0xaF3D76f1834A1d425780943C99Ea8A608f8a93f9 0x2e0847E8910a9732eB3fb1bb4b70a580ADAD4FE3; do echo "other line $T: $(cast call $T "balanceOf(address)(uint256)" "$RESERVE" --rpc-url "$LOCAL")"; done
 USDG_LEFT=$(cast call 0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168 "balanceOf(address)(uint256)" "$RESERVE" --rpc-url "$LOCAL")
 echo "NVDA before: $BEFORE"; echo "NVDA after:  $AFTER"; echo "USDG left:   $USDG_LEFT"
 [ "${AFTER%% *}" != "0" ] && [ "${AFTER%% *}" != "${BEFORE%% *}" ] && echo "E2E OK: the keeper put NVDA in the reserve" || { echo "E2E FAILED"; exit 1; }
