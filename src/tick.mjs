@@ -66,7 +66,9 @@ export async function tick({ rpcUrl = env('RH_RPC_URL', 'https://rpc.mainnet.cha
   const lines = [];
   for (let index = 0; index < count; index++) {
     const line = await read(reserve, reserveAbi, 'lines', [BigInt(index)]);
-    const gap = BigInt(line[3]) - (await read(reserve, reserveAbi, 'weightBps', [BigInt(index)]));
+    let gap;
+    try { gap = BigInt(line[3]) - (await read(reserve, reserveAbi, 'weightBps', [BigInt(index)])); }
+    catch (error) { log('line', index, 'weight unreadable, skipped:', (error.shortMessage || error.message || '').split('\n')[0]); continue; }
     lines.push({ index, line, gap });
   }
   // Furthest below target first. Each line is offered what would bring it to target, never less than one unit of
@@ -77,8 +79,17 @@ export async function tick({ rpcUrl = env('RH_RPC_URL', 'https://rpc.mainnet.cha
   for (const { index, line, gap } of lines) {
     if (done.sweeps.length >= maxSweeps || remaining < unit || gap <= 0n) break;
     const [token, feed, pool, targetBps, payIsToken0] = line;
-    const sharePrice = await read(reserve, reserveAbi, 'poolSharePriceOf', [{ token, feed, pool, targetBps, payIsToken0 }]);
-    const multiplier = await read(token, erc20Abi, 'uiMultiplier');
+    // A line whose pool cannot even be priced (empty, or priced off the scale) is skipped, never fatal: the next
+    // line must still get its turn, and this line is reported so the operator can point it at a better pool.
+    let sharePrice, multiplier;
+    try {
+      sharePrice = await read(reserve, reserveAbi, 'poolSharePriceOf', [{ token, feed, pool, targetBps, payIsToken0 }]);
+      multiplier = await read(token, erc20Abi, 'uiMultiplier');
+    } catch (error) {
+      log('line', index, 'cannot be priced, skipped:', (error.shortMessage || error.message || '').split('\n')[0]);
+      done.skipped = [...(done.skipped ?? []), index];
+      continue;
+    }
     const expectedOut = amount => ((amount * 10n ** 18n / unit) * 10n ** 18n / sharePrice) * 10n ** 18n / multiplier;
     const toTarget = nav * gap / BPS * unit / 10n ** 18n;
     let amount = toTarget > remaining ? remaining : toTarget < unit ? unit : toTarget;
